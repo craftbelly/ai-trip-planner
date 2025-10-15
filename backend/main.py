@@ -53,7 +53,7 @@ from langchain_community.vectorstores import InMemoryVectorStore
 import httpx
 
 
-class TripRequest(BaseModel):
+class CrawlRequest(BaseModel):
     destination: str
     duration: str
     budget: Optional[str] = None
@@ -66,7 +66,7 @@ class TripRequest(BaseModel):
     turn_index: Optional[int] = None
 
 
-class TripResponse(BaseModel):
+class CrawlResponse(BaseModel):
     result: str
     tool_calls: List[Dict[str, Any]] = []
 
@@ -372,39 +372,39 @@ def _with_prefix(prefix: str, summary: str) -> str:
 # Tools with real API calls + LLM fallback (graceful degradation pattern)
 @tool
 def essential_info(destination: str) -> str:
-    """Return essential destination info like weather, sights, and etiquette."""
+    """Return essential destination info like weather, sights, and neighborhood scene for brew crawl planning."""
     query = f"{destination} travel essentials weather best time top attractions etiquette language currency safety"
     summary = _search_api(query)
     if summary:
         return _with_prefix(f"{destination} essentials", summary)
     
     # LLM fallback when no search API is configured
-    instruction = f"Summarize the climate, best visit time, standout sights, customs, language, currency, and safety tips for {destination}."
+    instruction = f"Summarize the climate, best visit time, standout sights, customs, language, currency, and safety tips for {destination} for brew crawl planning."
     return _llm_fallback(instruction)
 
 
 @tool
 def budget_basics(destination: str, duration: str) -> str:
-    """Return high-level budget categories for a given destination and duration."""
+    """Return high-level crawl budget categories for a given destination and duration."""
     query = f"{destination} travel budget average daily costs {duration}"
     summary = _search_api(query)
     if summary:
         return _with_prefix(f"{destination} budget {duration}", summary)
     
-    instruction = f"Outline lodging, meals, transport, activities, and extra costs for a {duration} trip to {destination}."
+    instruction = f"Outline accommodation, meals, transport, activities, and extra costs for a {duration} brew crawl to {destination}."
     return _llm_fallback(instruction)
 
 
 @tool
 def local_flavor(destination: str, interests: Optional[str] = None) -> str:
-    """Suggest authentic local experiences matching optional interests."""
+    """Suggest craft breweries and bars matching optional interests."""
     focus = interests or "local culture"
     query = f"{destination} authentic local experiences {focus}"
     summary = _search_api(query)
     if summary:
         return _with_prefix(f"{destination} {focus}", summary)
     
-    instruction = f"Recommend authentic local experiences in {destination} that highlight {focus}."
+    instruction = f"Recommend craft breweries and bars in {destination} that highlight {focus}."
     return _llm_fallback(instruction)
 
 
@@ -508,9 +508,9 @@ def packing_list(destination: str, duration: str, activities: Optional[List[str]
     return _llm_fallback(instruction)
 
 
-class TripState(TypedDict):
+class CrawlState(TypedDict):
     messages: Annotated[List[BaseMessage], operator.add]
-    trip_request: Dict[str, Any]
+    crawl_request: Dict[str, Any]
     research: Optional[str]
     budget: Optional[str]
     local: Optional[str]
@@ -518,12 +518,12 @@ class TripState(TypedDict):
     tool_calls: Annotated[List[Dict[str, Any]], operator.add]
 
 
-def research_agent(state: TripState) -> TripState:
-    req = state["trip_request"]
+def research_agent(state: CrawlState) -> CrawlState:
+    req = state["crawl_request"]
     destination = req["destination"]
     prompt_t = (
-        "You are a research assistant.\n"
-        "Gather essential information about {destination}.\n"
+        "You are a research assistant for brew crawl planning.\n"
+        "Gather essential information about {destination} for a beer crawl.\n"
         "Use tools to get weather, visa, and essential info, then summarize."
     )
     vars_ = {"destination": destination}
@@ -573,14 +573,14 @@ def research_agent(state: TripState) -> TripState:
     return {"messages": [SystemMessage(content=out)], "research": out, "tool_calls": calls}
 
 
-def budget_agent(state: TripState) -> TripState:
-    req = state["trip_request"]
+def budget_agent(state: CrawlState) -> CrawlState:
+    req = state["crawl_request"]
     destination, duration = req["destination"], req["duration"]
     budget = req.get("budget", "moderate")
     prompt_t = (
-        "You are a budget analyst.\n"
-        "Analyze costs for {destination} over {duration} with budget: {budget}.\n"
-        "Use tools to get pricing information, then provide a detailed breakdown."
+        "You are a budget analyst for brew crawl planning.\n"
+        "Analyze crawl costs for {destination} over {duration} with budget: {budget}.\n"
+        "Use tools to get pricing information for breweries and bars, then provide a detailed breakdown."
     )
     vars_ = {"destination": destination, "duration": duration, "budget": budget}
     
@@ -612,7 +612,7 @@ def budget_agent(state: TripState) -> TripState:
         messages.append(res)
         messages.extend(tr["messages"])
         
-        synthesis_prompt = f"Create a detailed budget breakdown for {duration} in {destination} with a {budget} budget."
+        synthesis_prompt = f"Create a detailed crawl budget breakdown for {duration} in {destination} with a {budget} budget."
         messages.append(SystemMessage(content=synthesis_prompt))
         
         # Instrument synthesis LLM call
@@ -626,8 +626,8 @@ def budget_agent(state: TripState) -> TripState:
     return {"messages": [SystemMessage(content=out)], "budget": out, "tool_calls": calls}
 
 
-def local_agent(state: TripState) -> TripState:
-    req = state["trip_request"]
+def local_agent(state: CrawlState) -> CrawlState:
+    req = state["crawl_request"]
     destination = req["destination"]
     interests = req.get("interests", "local culture")
     travel_style = req.get("travel_style", "standard")
@@ -648,9 +648,9 @@ def local_agent(state: TripState) -> TripState:
     context_text = "\n".join(context_lines) if context_lines else ""
     
     prompt_t = (
-        "You are a local guide.\n"
-        "Find authentic experiences in {destination} for someone interested in: {interests}.\n"
-        "Travel style: {travel_style}. Use tools to gather local insights.\n"
+        "You are a local guide for brew crawl planning.\n"
+        "Find craft breweries and bars in {destination} for someone interested in: {interests}.\n"
+        "Crawl style: {travel_style}. Use tools to gather local brewery and bar insights.\n"
     )
     
     # Add retrieved context to prompt if available
@@ -694,7 +694,7 @@ def local_agent(state: TripState) -> TripState:
         messages.append(res)
         messages.extend(tr["messages"])
         
-        synthesis_prompt = f"Create a curated list of authentic experiences for someone interested in {interests} with a {travel_style} approach."
+        synthesis_prompt = f"Create a curated list of craft breweries and bars for someone interested in {interests} with a {travel_style} approach."
         messages.append(SystemMessage(content=synthesis_prompt))
         
         # Instrument synthesis LLM call
@@ -708,15 +708,15 @@ def local_agent(state: TripState) -> TripState:
     return {"messages": [SystemMessage(content=out)], "local": out, "tool_calls": calls}
 
 
-def itinerary_agent(state: TripState) -> TripState:
-    req = state["trip_request"]
+def itinerary_agent(state: CrawlState) -> CrawlState:
+    req = state["crawl_request"]
     destination = req["destination"]
     duration = req["duration"]
     travel_style = req.get("travel_style", "standard")
     user_input = (req.get("user_input") or "").strip()
     
     prompt_parts = [
-        "Create a {duration} itinerary for {destination} ({travel_style}).",
+        "Create a {duration} brew crawl route for {destination} ({travel_style}).",
         "",
         "Inputs:",
         "Research: {research}",
@@ -757,7 +757,7 @@ def itinerary_agent(state: TripState) -> TripState:
 
 
 def build_graph():
-    g = StateGraph(TripState)
+    g = StateGraph(CrawlState)
     g.add_node("research_node", research_agent)
     g.add_node("budget_node", budget_agent)
     g.add_node("local_node", local_agent)
@@ -779,7 +779,7 @@ def build_graph():
     return g.compile()
 
 
-app = FastAPI(title="AI Trip Planner")
+app = FastAPI(title="Brew Crawl Planner")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -800,7 +800,7 @@ def serve_frontend():
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "service": "ai-trip-planner"}
+    return {"status": "healthy", "service": "brew-crawl-planner"}
 
 
 # Initialize tracing once at startup, not per request
@@ -809,21 +809,21 @@ if _TRACING:
         space_id = os.getenv("ARIZE_SPACE_ID")
         api_key = os.getenv("ARIZE_API_KEY")
         if space_id and api_key:
-            tp = register(space_id=space_id, api_key=api_key, project_name="ai-trip-planner")
+            tp = register(space_id=space_id, api_key=api_key, project_name="brew-crawl-planner")
             LangChainInstrumentor().instrument(tracer_provider=tp, include_chains=True, include_agents=True, include_tools=True)
             LiteLLMInstrumentor().instrument(tracer_provider=tp, skip_dep_check=True)
     except Exception:
         pass
 
-@app.post("/plan-trip", response_model=TripResponse)
-def plan_trip(req: TripRequest):
+@app.post("/plan-crawl", response_model=CrawlResponse)
+def plan_crawl(req: CrawlRequest):
     graph = build_graph()
     
     # Only include necessary fields in initial state
     # Agent outputs (research, budget, local, final) will be added during execution
     state = {
         "messages": [],
-        "trip_request": req.model_dump(),
+        "crawl_request": req.model_dump(),
         "tool_calls": [],
     }
     
@@ -850,7 +850,7 @@ def plan_trip(req: TripRequest):
         with using_attributes(**attrs_kwargs):
             out = graph.invoke(state)
     
-    return TripResponse(result=out.get("final", ""), tool_calls=out.get("tool_calls", []))
+    return CrawlResponse(result=out.get("final", ""), tool_calls=out.get("tool_calls", []))
 
 
 if __name__ == "__main__":

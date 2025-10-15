@@ -7,15 +7,15 @@
   },
   {
     "city": "Prague",
-    "interests": ["food", "beer"],
-    "description": "Take the Taste of Prague Vinohrady safari where guides pair farmhouse koláče with Moravian orange wine, then end in Karlín's Veltlin cellar for a vertical tasting of Czech pét-nats and tankova beer straight from the lagering tank.",
-    "source": "https://www.tasteofprague.cz"
+    "interests": ["beer", "craft breweries"],
+    "description": "Visit U Fleků, Prague's oldest brewery since 1499, for their signature dark lager, then explore the craft beer scene at Pivovar U Tří růží for innovative Czech IPAs and seasonal brews in a historic setting.",
+    "source": "https://www.ufleku.cz"
   },
   {
     "city": "Prague",
-    "interests": ["art", "families"],
-    "description": "Spend the morning exploring DOX Centre's interactive installations before a storytelling workshop aboard the Gulliver airship, followed by hands-on puppet carving at the Museum of Czech Puppets in Malá Strana.",
-    "source": "https://www.dox.cz/en"
+    "interests": ["beer", "local breweries"],
+    "description": "Discover Prague's hidden brewery gems starting with Pivovar Staropramen for traditional Czech lagers, then visit Lokál for fresh tank beer and authentic pub atmosphere in the heart of the city.",
+    "source": "https://www.staropramen.cz"
   },
   {
     "city": "Prague",

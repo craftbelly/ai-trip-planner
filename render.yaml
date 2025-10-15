@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: ai-trip-planner-backend
+    name: brew-crawl-planner-backend
     env: python
     plan: free
     rootDir: backend

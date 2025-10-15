@@ -2,7 +2,7 @@
 """
 Synthetic generator focused on provoking bad tool calls for demoing Arize Evals.
 
-- Sends crafted requests to /plan-trip to encourage wrong/misaligned tool use
+- Sends crafted requests to /plan-crawl to encourage wrong/misaligned tool use
 - Captures tool_calls returned by the backend and flags likely mistakes
 - Saves a concise JSON report you can correlate with Arize traces
 
@@ -31,10 +31,10 @@ def scenarios_bad_tool_calls() -> List[Dict[str, Any]]:
         {
             "name": "Weather Asked In Budget Field",
             "request": {
-                "destination": "Dubai, UAE",
-                "duration": "5 days",
-                "budget": "What are the weather patterns and entry fees?",
-                "interests": "luxury shopping, desert safari",
+                "destination": "Portland, Oregon",
+                "duration": "3 days",
+                "budget": "What are the weather patterns and brewery entry fees?",
+                "interests": "IPAs, stouts, local breweries",
                 "travel_style": "luxury",
             },
             "recommended_tools": ["get_destination_weather", "search_destination_info"],
@@ -43,22 +43,22 @@ def scenarios_bad_tool_calls() -> List[Dict[str, Any]]:
         {
             "name": "Itinerary Asked In Budget",
             "request": {
-                "destination": "Barcelona, Spain",
-                "duration": "4 days",
-                "budget": "Create an optimized hour-by-hour schedule",
-                "interests": "architecture, beaches, nightlife",
+                "destination": "San Diego, California",
+                "duration": "2 days",
+                "budget": "Create an optimized hour-by-hour brewery schedule",
+                "interests": "IPAs, sours, craft breweries",
                 "travel_style": "standard",
             },
             "recommended_tools": ["create_daily_schedule", "calculate_travel_time"],
             "wrong_tools": ["get_attraction_prices", "calculate_accommodation_cost"],
         },
         {
-            "name": "Local Customs Ignored For Food",
+            "name": "Local Customs Ignored For Beer",
             "request": {
-                "destination": "Marrakech, Morocco",
-                "duration": "1 week",
-                "budget": "$1500",
-                "interests": "what etiquette and local customs should I know?",
+                "destination": "Munich, Germany",
+                "duration": "4 days",
+                "budget": "$800",
+                "interests": "what beer etiquette and local customs should I know?",
                 "travel_style": "authentic",
             },
             "recommended_tools": ["get_local_customs"],
@@ -67,10 +67,10 @@ def scenarios_bad_tool_calls() -> List[Dict[str, Any]]:
         {
             "name": "Visa Asked As Interest",
             "request": {
-                "destination": "Bangkok, Thailand",
-                "duration": "7 days",
-                "budget": "$1200",
-                "interests": "I need visa info and embassy rules",
+                "destination": "Brussels, Belgium",
+                "duration": "5 days",
+                "budget": "$900",
+                "interests": "I need visa info and embassy rules for beer tourism",
                 "travel_style": "budget",
             },
             "recommended_tools": ["research_visa_requirements", "search_destination_info"],
@@ -79,10 +79,10 @@ def scenarios_bad_tool_calls() -> List[Dict[str, Any]]:
         {
             "name": "Exact Prices Everywhere",
             "request": {
-                "destination": "Tokyo, Japan",
-                "duration": "6 days",
-                "budget": "$900",
-                "interests": "exact accommodation prices, precise weather data, specific restaurant prices",
+                "destination": "Denver, Colorado",
+                "duration": "4 days",
+                "budget": "$600",
+                "interests": "exact brewery prices, precise weather data, specific beer costs",
                 "travel_style": "data-driven",
             },
             "recommended_tools": [
@@ -95,10 +95,10 @@ def scenarios_bad_tool_calls() -> List[Dict[str, Any]]:
         {
             "name": "Hidden Gems Request But Uses Food Cost",
             "request": {
-                "destination": "Rome, Italy",
-                "duration": "5 days",
-                "budget": "$1000",
-                "interests": "hidden gems only",
+                "destination": "Austin, Texas",
+                "duration": "3 days",
+                "budget": "$500",
+                "interests": "hidden brewery gems only",
                 "travel_style": "adventure",
             },
             "recommended_tools": ["find_hidden_gems"],
@@ -111,10 +111,10 @@ def scenarios_bad_tool_calls() -> List[Dict[str, Any]]:
         {
             "name": "Frustrated: Generic Answers",
             "request": {
-                "destination": "Lisbon, Portugal",
-                "duration": "5 days",
-                "budget": "$1200",
-                "interests": "I'm really frustrated. Stop giving generic advice and give me specifics only.",
+                "destination": "Seattle, Washington",
+                "duration": "3 days",
+                "budget": "$400",
+                "interests": "I'm really frustrated. Stop giving generic brewery advice and give me specifics only.",
                 "travel_style": "standard",
             },
             "frustrated": True,
@@ -122,10 +122,10 @@ def scenarios_bad_tool_calls() -> List[Dict[str, Any]]:
         {
             "name": "Frustrated: Multiple Attempts",
             "request": {
-                "destination": "Prague, Czech Republic",
-                "duration": "3 days",
-                "budget": "$800",
-                "interests": "This is the third time I'm asking. Please acknowledge that and be concise.",
+                "destination": "Milwaukee, Wisconsin",
+                "duration": "2 days",
+                "budget": "$300",
+                "interests": "This is the third time I'm asking about breweries. Please acknowledge that and be concise.",
                 "travel_style": "budget",
             },
             "frustrated": True,
@@ -133,10 +133,10 @@ def scenarios_bad_tool_calls() -> List[Dict[str, Any]]:
         {
             "name": "Frustrated: Strict Instructions",
             "request": {
-                "destination": "New York City, USA",
+                "destination": "Chicago, Illinois",
                 "duration": "2 days",
-                "budget": "$500",
-                "interests": "I'm annoyed. Do not upsell. Only free or cheap options.",
+                "budget": "$200",
+                "interests": "I'm annoyed. Do not upsell. Only free brewery tours or cheap beer options.",
                 "travel_style": "budget",
             },
             "frustrated": True,
@@ -146,8 +146,8 @@ def scenarios_bad_tool_calls() -> List[Dict[str, Any]]:
     return base + frustrated
 
 
-def post_plan_trip(base_url: str, payload: Dict[str, Any], timeout: int = 60) -> Dict[str, Any]:
-    url = f"{base_url.rstrip('/')}/plan-trip"
+def post_plan_crawl(base_url: str, payload: Dict[str, Any], timeout: int = 60) -> Dict[str, Any]:
+    url = f"{base_url.rstrip('/')}/plan-crawl"
     r = requests.post(url, json=payload, timeout=timeout)
     try:
         data = r.json()
@@ -233,12 +233,12 @@ def main():
     if args.test_rag:
         rag_scenarios = [
             {
-                "name": "RAG Test: Prague History",
+                "name": "RAG Test: Prague Breweries",
                 "request": {
                     "destination": "Prague",
-                    "duration": "4 days",
-                    "budget": "$1200",
-                    "interests": "history, architecture",
+                    "duration": "3 days",
+                    "budget": "$600",
+                    "interests": "beer, craft breweries",
                     "travel_style": "cultural",
                     "session_id": "rag_test_001",
                     "user_id": "test_user",
@@ -249,12 +249,12 @@ def main():
                 "expect_rag": True,
             },
             {
-                "name": "RAG Test: Tokyo Food and Anime",
+                "name": "RAG Test: Tokyo Craft Beer",
                 "request": {
                     "destination": "Tokyo",
-                    "duration": "6 days",
-                    "budget": "$2000",
-                    "interests": "food, anime, technology",
+                    "duration": "4 days",
+                    "budget": "$800",
+                    "interests": "craft beer, local breweries",
                     "travel_style": "enthusiast",
                     "session_id": "rag_test_002",
                     "user_id": "test_user",
@@ -265,12 +265,12 @@ def main():
                 "expect_rag": True,
             },
             {
-                "name": "RAG Test: Barcelona Art and Food",
+                "name": "RAG Test: Barcelona Craft Beer",
                 "request": {
                     "destination": "Barcelona",
-                    "duration": "5 days",
-                    "budget": "$1500",
-                    "interests": "art, food, architecture",
+                    "duration": "3 days",
+                    "budget": "$600",
+                    "interests": "craft beer, local breweries",
                     "travel_style": "explorer",
                     "session_id": "rag_test_003",
                     "user_id": "test_user",
@@ -281,12 +281,12 @@ def main():
                 "expect_rag": True,
             },
             {
-                "name": "RAG Test: Bangkok Markets",
+                "name": "RAG Test: Bangkok Craft Beer",
                 "request": {
                     "destination": "Bangkok",
-                    "duration": "5 days",
-                    "budget": "$800",
-                    "interests": "food, markets, wellness",
+                    "duration": "3 days",
+                    "budget": "$400",
+                    "interests": "craft beer, local breweries",
                     "travel_style": "authentic",
                     "session_id": "rag_test_004",
                     "user_id": "test_user",
@@ -297,12 +297,12 @@ def main():
                 "expect_rag": True,
             },
             {
-                "name": "RAG Test: New York Neighborhoods",
+                "name": "RAG Test: New York Craft Beer",
                 "request": {
                     "destination": "New York",
-                    "duration": "4 days",
-                    "budget": "$2500",
-                    "interests": "food, art, neighborhoods",
+                    "duration": "3 days",
+                    "budget": "$800",
+                    "interests": "craft beer, local breweries",
                     "travel_style": "local",
                     "session_id": "rag_test_005",
                     "user_id": "test_user",
@@ -315,12 +315,12 @@ def main():
         ]
         scenarios.extend(rag_scenarios)
         print(f"\n✨ Added {len(rag_scenarios)} RAG test scenarios")
-        print("📝 These scenarios test retrieval with specific cities in the database")
-        print("🔍 Check responses for curated guide sources when ENABLE_RAG=1\n")
+        print("📝 These scenarios test retrieval with specific brewery cities in the database")
+        print("🔍 Check responses for curated brewery guide sources when ENABLE_RAG=1\n")
     
     results: List[Dict[str, Any]] = []
 
-    print("🌋 Generating synthetic bad-tool-call requests")
+    print("🌋 Generating synthetic bad-tool-call requests for brew crawl planning")
     print("=" * 70)
     print(f"Target: {args.base_url}")
 
@@ -330,7 +330,7 @@ def main():
         print(f"\n#{i+1:02d} {scenario['name']} → {payload['destination']} ({payload['duration']})")
 
         start = time.time()
-        resp = post_plan_trip(args.base_url, payload)
+        resp = post_plan_crawl(args.base_url, payload)
         elapsed = time.time() - start
 
         status = resp["status"]

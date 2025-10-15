@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Plan Your Perfect Trip</title>
+  <title>Explore Craft Beer Scenes</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="bg-neutral-50 text-neutral-900 antialiased font-[Inter]">
+<body class="bg-blue-50 text-neutral-900 antialiased font-[Inter]">
   <!-- Nav -->
   <header class="border-b border-neutral-200 bg-white/80 backdrop-blur">
     <div class="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
@@ -17,7 +17,7 @@
         <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-indigo-600 via-violet-600 to-fuchsia-600 text-white">
           <i data-lucide="compass" class="h-5 w-5"></i>
         </span>
-        <span class="text-lg font-semibold tracking-tight">Trip Planner</span>
+        <span class="text-lg font-semibold tracking-tight">Brew Crawl Planner</span>
       </div>
     </div>
   </header>
@@ -32,10 +32,10 @@
       <div class="relative grid gap-6 p-8 md:grid-cols-3 md:p-12">
         <div class="md:col-span-2">
           <h1 class="text-white text-4xl md:text-5xl font-semibold tracking-tight leading-tight">
-            Plan Your Perfect Trip
+            Explore Craft Beer Scenes
           </h1>
           <p class="mt-3 text-indigo-100/90 text-base md:text-lg">
-            Discover destinations, craft smart budgets, and get a personalized day-by-day itinerary in seconds.
+            Discover craft breweries, plan your crawl budget, and get a personalized brewery route in seconds.
           </p>
           <div class="mt-6 flex flex-wrap items-center gap-3">
             <div class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-white text-sm">
@@ -44,11 +44,11 @@
             </div>
             <div class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-white text-sm">
               <i data-lucide="map" class="h-4 w-4"></i>
-              Smarter routes
+              Smart routes
             </div>
             <div class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-white text-sm">
               <i data-lucide="sparkles" class="h-4 w-4"></i>
-              Local gems
+              Craft breweries
             </div>
           </div>
         </div>
@@ -118,15 +118,15 @@
     <div class="grid gap-6 lg:grid-cols-3">
       <!-- Form -->
       <section class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-        <h2 class="text-2xl font-semibold tracking-tight">Plan Your Trip</h2>
-        <p class="mt-1 text-sm text-neutral-600">Enter a destination, number of days, budget, and interests.</p>
+        <h2 class="text-2xl font-semibold tracking-tight">Plan Your Crawl</h2>
+        <p class="mt-1 text-sm text-neutral-600">Enter a city, number of days, budget, and beer interests.</p>
 
         <form id="plannerForm" class="mt-6 space-y-4" autocomplete="off">
           <!-- Destination -->
           <div>
-            <label for="destination" class="block text-sm font-medium text-neutral-800">Destination</label>
+            <label for="destination" class="block text-sm font-medium text-neutral-800">City</label>
             <div class="mt-2 relative">
-              <input id="destination" type="text" required placeholder="e.g., Kyoto, Japan"
+              <input id="destination" type="text" required placeholder="e.g., Portland, Oregon"
                      class="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-neutral-900 placeholder-neutral-400 shadow-sm outline-none ring-0 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
               <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
                 <i data-lucide="map-pin" class="h-4.5 w-4.5"></i>
@@ -182,9 +182,9 @@
 
           <!-- Interests -->
           <div>
-            <label for="interests" class="block text-sm font-medium text-neutral-800">Interests</label>
+            <label for="interests" class="block text-sm font-medium text-neutral-800">Beer Interests</label>
             <div class="mt-2 relative">
-              <input id="interests" type="text" placeholder="e.g., food, culture, museums, nightlife"
+              <input id="interests" type="text" placeholder="e.g., IPAs, stouts, sours, local breweries"
                      class="w-full rounded-lg border border-neutral-300 bg-white px-3.5 py-2.5 text-neutral-900 placeholder-neutral-400 shadow-sm outline-none ring-0 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200" />
               <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400">
                 <i data-lucide="sparkles" class="h-4.5 w-4.5"></i>
@@ -197,7 +197,7 @@
             <button type="submit"
                     class="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 py-3 text-white shadow-sm transition hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-300">
               <i data-lucide="route" class="h-5 w-5"></i>
-              <span class="font-medium">Plan My Trip</span>
+              <span class="font-medium">Plan My Crawl</span>
             </button>
           </div>
         </form>
@@ -206,29 +206,29 @@
       <!-- Output -->
       <section class="lg:col-span-2 space-y-6">
         <div id="placeholderCard" class="rounded-xl border border-neutral-200 bg-white p-8 text-center shadow-sm">
-          <h3 class="text-xl md:text-2xl font-semibold tracking-tight">Fill out the form to get your personalized trip plan</h3>
-          <p class="mt-2 text-neutral-600">Enter your details on the left—your itinerary will appear here.</p>
+          <h3 class="text-xl md:text-2xl font-semibold tracking-tight">Fill out the form to get your personalized brew crawl</h3>
+          <p class="mt-2 text-neutral-600">Enter your details on the left—your brewery route will appear here.</p>
           <div class="mt-6 grid gap-3 sm:grid-cols-3">
             <div class="rounded-lg border border-neutral-200 p-4">
               <div class="flex items-center gap-2 text-neutral-700">
                 <i data-lucide="sunrise" class="h-4 w-4"></i>
-                Morning ideas
+                Morning breweries
               </div>
-              <p class="mt-1 text-sm text-neutral-600">Neighborhood walk, cafe, must-see spot.</p>
+              <p class="mt-1 text-sm text-neutral-600">Early taproom visits, coffee stouts, breakfast beers.</p>
             </div>
             <div class="rounded-lg border border-neutral-200 p-4">
               <div class="flex items-center gap-2 text-neutral-700">
                 <i data-lucide="utensils" class="h-4 w-4"></i>
-                Food moments
+                Food pairings
               </div>
-              <p class="mt-1 text-sm text-neutral-600">Street food to chef-led tastings.</p>
+              <p class="mt-1 text-sm text-neutral-600">Brewery kitchens to food truck partnerships.</p>
             </div>
             <div class="rounded-lg border border-neutral-200 p-4">
               <div class="flex items-center gap-2 text-neutral-700">
                 <i data-lucide="moon" class="h-4 w-4"></i>
-                Evenings
+                Evening spots
               </div>
-              <p class="mt-1 text-sm text-neutral-600">Sunsets, shows, speakeasies.</p>
+              <p class="mt-1 text-sm text-neutral-600">Taprooms, beer gardens, late-night pours.</p>
             </div>
           </div>
         </div>
@@ -245,7 +245,7 @@
           <span class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-neutral-900 text-white">
             <i data-lucide="compass" class="h-4.5 w-4.5"></i>
           </span>
-          <span>&copy; <span id="year"></span> Trip Planner</span>
+          <span>&copy; <span id="year"></span> Brew Crawl Planner</span>
         </div>
         <div class="flex items-center gap-4">
           <a class="hover:text-neutral-900" href="#">Privacy</a>
@@ -311,16 +311,16 @@
       results.classList.remove('hidden');
       results.innerHTML = `
         <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-          <div class="flex items-center gap-3 text-neutral-700">
-            <i data-lucide="loader-2" class="h-5 w-5 animate-spin"></i>
-            Planning your itinerary...
-          </div>
+            <div class="flex items-center gap-3 text-neutral-700">
+              <i data-lucide="loader-2" class="h-5 w-5 animate-spin"></i>
+              Planning your brew crawl...
+            </div>
         </div>
       `;
       renderIcons();
 
       try {
-        const resp = await fetch('/plan-trip', {
+        const resp = await fetch('/plan-crawl', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ destination, duration, budget, interests })
@@ -334,7 +334,7 @@
         results.innerHTML = `
           <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
             <div class="mb-3 flex items-center justify-between">
-              <h3 class="text-xl font-semibold tracking-tight">Your Itinerary</h3>
+              <h3 class="text-xl font-semibold tracking-tight">Your Brew Crawl</h3>
               <button id="printBtn" class="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm hover:bg-neutral-50">
                 <i data-lucide="printer" class="h-4 w-4"></i> Print / PDF
               </button>
@@ -350,7 +350,7 @@
           <div class="rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">
             <div class="flex items-center gap-2">
               <i data-lucide="alert-triangle" class="h-5 w-5"></i>
-              <span>Failed to plan trip. Please try again.</span>
+              <span>Failed to plan crawl. Please try again.</span>
             </div>
           </div>
         `;
