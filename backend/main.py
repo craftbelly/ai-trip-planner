@@ -799,8 +799,24 @@ app.add_middleware(
 # Mount static files for images
 backend_dir = Path(__file__).resolve().parent
 images_dir = backend_dir.parent / "frontend" / "images"
+
+# Debug: Log the paths for troubleshooting
+print(f"Backend dir: {backend_dir}")
+print(f"Images dir: {images_dir}")
+print(f"Images dir exists: {images_dir.exists()}")
+
 if images_dir.exists():
     app.mount("/images", StaticFiles(directory=str(images_dir)), name="images")
+    print(f"Mounted images from: {images_dir}")
+else:
+    print(f"Images directory not found at: {images_dir}")
+    # Try alternative path structure for Render
+    alt_images_dir = backend_dir / "frontend" / "images"
+    if alt_images_dir.exists():
+        app.mount("/images", StaticFiles(directory=str(alt_images_dir)), name="images")
+        print(f"Mounted images from alternative path: {alt_images_dir}")
+    else:
+        print(f"Alternative images directory also not found: {alt_images_dir}")
 
 
 @app.get("/")
