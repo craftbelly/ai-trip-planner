@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import os
@@ -788,14 +789,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files for images
+backend_dir = Path(__file__).resolve().parent
+images_dir = backend_dir.parent / "frontend" / "images"
+if images_dir.exists():
+    app.mount("/images", StaticFiles(directory=str(images_dir)), name="images")
+
 
 @app.get("/")
 def serve_frontend():
-    here = os.path.dirname(__file__)
-    path = os.path.join(here, "..", "frontend", "index.html")
-    if os.path.exists(path):
-        return FileResponse(path)
-    return {"message": "frontend/index.html not found"}
+    # Use Path for robust path resolution
+    backend_dir = Path(__file__).resolve().parent
+    frontend_path = backend_dir.parent / "frontend" / "index.html"
+    if frontend_path.exists():
+        return FileResponse(str(frontend_path))
+    return {"message": f"frontend/index.html not found at {frontend_path}", "backend_dir": str(backend_dir), "frontend_path": str(frontend_path)}
 
 
 @app.get("/health")
