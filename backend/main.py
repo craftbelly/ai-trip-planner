@@ -102,7 +102,14 @@ def _init_llm():
         raise ValueError("Please set OPENAI_API_KEY or OPENROUTER_API_KEY in your .env")
 
 
-llm = _init_llm()
+# Initialize LLM lazily to avoid import-time errors
+llm = None
+
+def get_llm():
+    global llm
+    if llm is None:
+        llm = _init_llm()
+    return llm
 
 
 # Feature flag for optional RAG demo (opt-in for learning)
@@ -357,7 +364,7 @@ def _llm_fallback(instruction: str, context: Optional[str] = None) -> str:
     prompt = "Respond with 200 characters or less.\n" + instruction.strip()
     if context:
         prompt += "\nContext:\n" + context.strip()
-    response = llm.invoke([
+    response = get_llm().invoke([
         SystemMessage(content="You are a concise travel assistant."),
         HumanMessage(content=prompt),
     ])
@@ -531,7 +538,7 @@ def research_agent(state: CrawlState) -> CrawlState:
     
     messages = [SystemMessage(content=prompt_t.format(**vars_))]
     tools = [essential_info, weather_brief, visa_brief]
-    agent = llm.bind_tools(tools)
+    agent = get_llm().bind_tools(tools)
     
     calls: List[Dict[str, Any]] = []
     tool_results = []
@@ -566,7 +573,7 @@ def research_agent(state: CrawlState) -> CrawlState:
         # Instrument synthesis LLM call with its own prompt template
         synthesis_vars = {"destination": destination, "context": "tool_results"}
         with using_prompt_template(template=synthesis_prompt, variables=synthesis_vars, version="v1-synthesis"):
-            final_res = llm.invoke(messages)
+            final_res = get_llm().invoke(messages)
         out = final_res.content
     else:
         out = res.content
@@ -587,7 +594,7 @@ def budget_agent(state: CrawlState) -> CrawlState:
     
     messages = [SystemMessage(content=prompt_t.format(**vars_))]
     tools = [budget_basics, attraction_prices]
-    agent = llm.bind_tools(tools)
+    agent = get_llm().bind_tools(tools)
     
     calls: List[Dict[str, Any]] = []
     
@@ -619,7 +626,7 @@ def budget_agent(state: CrawlState) -> CrawlState:
         # Instrument synthesis LLM call
         synthesis_vars = {"duration": duration, "destination": destination, "budget": budget}
         with using_prompt_template(template=synthesis_prompt, variables=synthesis_vars, version="v1-synthesis"):
-            final_res = llm.invoke(messages)
+            final_res = get_llm().invoke(messages)
         out = final_res.content
     else:
         out = res.content
@@ -667,7 +674,7 @@ def local_agent(state: CrawlState) -> CrawlState:
     
     messages = [SystemMessage(content=prompt_t.format(**vars_))]
     tools = [local_flavor, local_customs, hidden_gems]
-    agent = llm.bind_tools(tools)
+    agent = get_llm().bind_tools(tools)
     
     calls: List[Dict[str, Any]] = []
     
@@ -701,7 +708,7 @@ def local_agent(state: CrawlState) -> CrawlState:
         # Instrument synthesis LLM call
         synthesis_vars = {"interests": interests, "travel_style": travel_style, "destination": destination}
         with using_prompt_template(template=synthesis_prompt, variables=synthesis_vars, version="v1-synthesis"):
-            final_res = llm.invoke(messages)
+            final_res = get_llm().invoke(messages)
         out = final_res.content
     else:
         out = res.content
@@ -752,7 +759,7 @@ def itinerary_agent(state: CrawlState) -> CrawlState:
         
         # Prompt template wrapper for Arize Playground integration
         with using_prompt_template(template=prompt_t, variables=vars_, version="v1"):
-            res = llm.invoke([SystemMessage(content=prompt_t.format(**vars_))])
+            res = get_llm().invoke([SystemMessage(content=prompt_t.format(**vars_))])
     
     return {"messages": [SystemMessage(content=res.content)], "final": res.content}
 
