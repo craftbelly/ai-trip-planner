@@ -7,7 +7,7 @@ services:
     buildCommand: |
       curl -LsSf https://astral.sh/uv/install.sh | sh || true
       export PATH="$HOME/.local/bin:$PATH"
-      python -m venv .venv
+      python3 -m venv .venv
       . .venv/bin/activate
       if command -v uv >/dev/null 2>&1; then
         uv pip install -r requirements.txt
@@ -26,6 +26,14 @@ services:
         sync: false
       - key: OPENROUTER_MODEL
         value: openai/gpt-4o-mini
+      - key: OPENAI_EMBED_MODEL
+        value: text-embedding-3-small
+      - key: ENABLE_RAG
+        value: "1"
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: SERPAPI_API_KEY
+        sync: false
       - key: ARIZE_SPACE_ID
         sync: false
       - key: ARIZE_API_KEY
