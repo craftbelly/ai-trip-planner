@@ -798,6 +798,7 @@ app.add_middleware(
 
 # Mount static files for images
 backend_dir = Path(__file__).resolve().parent
+# Since we're running from backend/ directory, frontend is at ../frontend/
 images_dir = backend_dir.parent / "frontend" / "images"
 
 # Debug: Log the paths for troubleshooting
