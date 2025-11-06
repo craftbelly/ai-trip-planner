@@ -1,4 +1,4 @@
-# AI Trip Planner
+# Brew Crawl Planner
 
 A **production-ready multi-agent system** built for learning and customization. This repo demonstrates three essential AI engineering patterns that students can study, modify, and adapt for their own use cases.
 
@@ -160,7 +160,7 @@ uv pip install -r requirements.txt   # faster, deterministic installs
 
 4) Run
 ```bash
-# make sure you are back in the root directory of ai-trip-planner
+# make sure you are back in the root directory of brew-crawl-planner
 cd ..
 ./start.sh                      # starts backend on 8000; serves minimal UI at '/'
 # or
@@ -216,6 +216,21 @@ The local agent can use vector search to retrieve curated local experiences from
 When disabled (default), the local agent uses LLM-generated responses.
 
 See `RAG.md` for detailed documentation.
+
+### Location Search: HERE API (Recommended)
+
+For brewery searches with verified addresses, phone numbers, and hours:
+
+- **Enable**: Add `HERE_API_KEY` to your `.env` file (get from https://platform.here.com/)
+- **Benefits**: 
+  - ✅ Verified addresses for all breweries
+  - ✅ Phone numbers, websites, opening hours
+  - ✅ 250,000 free requests/month (enough for 40,000+ searches)
+  - ✅ 11x cheaper than Google Places ($1.50 vs $17 per 1,000 after free tier)
+- **Fallback**: Without HERE API, uses Tavily web search, then LLM generation
+- **Learning**: Multi-tier search with geocoding and proximity APIs
+
+See `HERE_API_SETUP.md` for detailed setup and `QUICK_START_HERE_API.md` for 3-minute setup.
 
 ### Web Search: Real-Time Tool Data
 

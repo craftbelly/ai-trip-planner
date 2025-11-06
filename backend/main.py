@@ -12,9 +12,9 @@ from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
-# Minimal observability via Arize/OpenInference (optional)
+# Minimal observability via Phoenix/OpenInference (optional)
 try:
-    from arize.otel import register
+    from phoenix.otel import register
     from openinference.instrumentation.langchain import LangChainInstrumentor
     from openinference.instrumentation.litellm import LiteLLMInstrumentor
     from openinference.instrumentation import using_prompt_template, using_metadata, using_attributes
@@ -52,6 +52,13 @@ from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.vectorstores import InMemoryVectorStore
 import httpx
+
+# HuggingFace embeddings for open-source alternative
+try:
+    from langchain_huggingface import HuggingFaceEmbeddings
+    _HF_AVAILABLE = True
+except ImportError:
+    _HF_AVAILABLE = False
 
 
 class CrawlRequest(BaseModel):
@@ -161,19 +168,46 @@ class LocalGuideRetriever:
             data_path: Path to local_guides.json file
         """
         self._docs = _load_local_documents(data_path)
-        self._embeddings: Optional[OpenAIEmbeddings] = None
+        self._embeddings = None
         self._vectorstore: Optional[InMemoryVectorStore] = None
         
-        # Only create embeddings when RAG is enabled and we have an API key
+        # Only create embeddings when RAG is enabled and we have docs
         if ENABLE_RAG and self._docs and not os.getenv("TEST_MODE"):
             try:
-                model = os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")
-                self._embeddings = OpenAIEmbeddings(model=model)
-                store = InMemoryVectorStore(embedding=self._embeddings)
-                store.add_documents(self._docs)
-                self._vectorstore = store
-            except Exception:
+                # Try HuggingFace embeddings first (free, open-source)
+                use_hf = os.getenv("USE_HUGGINGFACE_EMBEDDINGS", "1").lower() in {"1", "true", "yes"}
+                
+                if use_hf and _HF_AVAILABLE:
+                    # Use lightweight, fast model for MVP
+                    model_name = os.getenv("HUGGINGFACE_EMBED_MODEL", "all-MiniLM-L6-v2")
+                    print(f"🤗 Loading HuggingFace embeddings: {model_name}")
+                    self._embeddings = HuggingFaceEmbeddings(
+                        model_name=model_name,
+                        model_kwargs={'device': 'cpu'},
+                        encode_kwargs={'normalize_embeddings': True}
+                    )
+                    print(f"✅ HuggingFace embeddings loaded successfully")
+                elif os.getenv("OPENAI_API_KEY"):
+                    # Fall back to OpenAI if configured
+                    model = os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")
+                    print(f"🔑 Using OpenAI embeddings: {model}")
+                    self._embeddings = OpenAIEmbeddings(model=model)
+                else:
+                    print("⚠️  No embeddings available, using keyword fallback")
+                    self._embeddings = None
+                
+                # Create vector store if we have embeddings
+                if self._embeddings:
+                    store = InMemoryVectorStore(embedding=self._embeddings)
+                    print(f"📚 Indexing {len(self._docs)} documents...")
+                    store.add_documents(self._docs)
+                    self._vectorstore = store
+                    print(f"✅ Vector store ready with {len(self._docs)} documents")
+                    
+            except Exception as e:
                 # Gracefully degrade to keyword search if embeddings fail
+                print(f"⚠️  Embedding initialization failed: {e}")
+                print("   Falling back to keyword search")
                 self._embeddings = None
                 self._vectorstore = None
 
@@ -277,8 +311,11 @@ GUIDE_RETRIEVER = LocalGuideRetriever(_DATA_DIR / "local_guides.json")
 SEARCH_TIMEOUT = 10.0  # seconds
 
 
-def _compact(text: str, limit: int = 200) -> str:
-    """Compact text to a maximum length, truncating at word boundaries."""
+def _compact(text: str, limit: int = 800) -> str:
+    """Compact text to a maximum length, truncating at word boundaries.
+    
+    Increased to 800 chars to capture brewery names, addresses, and details.
+    """
     if not text:
         return ""
     cleaned = " ".join(text.split())
@@ -289,6 +326,137 @@ def _compact(text: str, limit: int = 200) -> str:
     if last_space > 0:
         truncated = truncated[:last_space]
     return truncated.rstrip(",.;- ")
+
+
+def _here_api_search_breweries(city: str, max_results: int = 10) -> Optional[str]:
+    """Search for breweries using HERE Places API with verified addresses and details.
+    
+    Returns structured brewery information including:
+    - Name and full address
+    - Phone numbers and website
+    - Categories and opening hours (if available)
+    - Distance from city center
+    """
+    here_key = os.getenv("HERE_API_KEY")
+    if not here_key or here_key == "your-here-api-key-here":
+        return None
+    
+    try:
+        with httpx.Client(timeout=SEARCH_TIMEOUT) as client:
+            # First, geocode the city to get coordinates
+            geocode_resp = client.get(
+                "https://geocode.search.hereapi.com/v1/geocode",
+                params={
+                    "q": city,
+                    "apiKey": here_key,
+                    "limit": 1,
+                }
+            )
+            geocode_resp.raise_for_status()
+            geocode_data = geocode_resp.json()
+            
+            if not geocode_data.get("items"):
+                return None
+            
+            location = geocode_data["items"][0]["position"]
+            lat, lng = location["lat"], location["lng"]
+            
+            # Use HERE Discover API instead of Browse for better brewery results
+            # Try different search queries to find breweries
+            search_queries = [
+                f"brewery {city}",
+                f"craft beer {city}",
+                f"brewpub {city}",
+            ]
+            all_results = []
+            
+            for query in search_queries:
+                try:
+                    discover_resp = client.get(
+                        "https://discover.search.hereapi.com/v1/discover",
+                        params={
+                            "at": f"{lat},{lng}",
+                            "q": query,
+                            "limit": 20,  # Get more results to filter
+                            "apiKey": here_key,
+                        }
+                    )
+                    discover_resp.raise_for_status()
+                    discover_data = discover_resp.json()
+                    all_results.extend(discover_data.get("items", []))
+                except Exception:
+                    continue  # Try next search query
+            
+            if not all_results:
+                return None
+            
+            # Deduplicate by ID and format results
+            # Filter to only include brewery-related places
+            seen_ids = set()
+            breweries = []
+            
+            for item in all_results:
+                place_id = item.get("id")
+                if place_id in seen_ids:
+                    continue
+                
+                name = item.get("title", "")
+                
+                # Filter: only include if name contains brewery-related terms
+                name_lower = name.lower()
+                if not any(term in name_lower for term in ["brew", "tap", "ale", "beer", "hop"]):
+                    continue
+                    
+                seen_ids.add(place_id)
+                address_obj = item.get("address", {})
+                address_parts = [
+                    address_obj.get("street", ""),
+                    address_obj.get("city", ""),
+                    address_obj.get("stateCode", ""),
+                    address_obj.get("postalCode", ""),
+                ]
+                address = ", ".join([p for p in address_parts if p])
+                
+                # Get additional details
+                contacts = item.get("contacts", [{}])[0] if item.get("contacts") else {}
+                phone = contacts.get("phone", [{}])[0].get("value", "") if contacts.get("phone") else ""
+                website = contacts.get("www", [{}])[0].get("value", "") if contacts.get("www") else ""
+                
+                categories = ", ".join([cat.get("name", "") for cat in item.get("categories", [])])
+                
+                # Opening hours
+                hours = ""
+                if item.get("openingHours"):
+                    hours_text = item["openingHours"][0].get("text", [])
+                    if hours_text:
+                        hours = "; ".join(hours_text[:3])  # First 3 days
+                
+                brewery_info = f"{name}"
+                if address:
+                    brewery_info += f"\nAddress: {address}"
+                if phone:
+                    brewery_info += f"\nPhone: {phone}"
+                if website:
+                    brewery_info += f"\nWebsite: {website}"
+                if categories:
+                    brewery_info += f"\nType: {categories}"
+                if hours:
+                    brewery_info += f"\nHours: {hours}"
+                
+                breweries.append(brewery_info)
+                
+                if len(breweries) >= max_results:
+                    break
+            
+            if not breweries:
+                return None
+            
+            result = f"Found {len(breweries)} breweries/beer bars in {city}:\n\n" + "\n\n".join(breweries)
+            return _compact(result, limit=2000)  # More space for detailed venue info
+            
+    except Exception as e:
+        # Fail gracefully and fall back to other search methods
+        return None
 
 
 def _search_api(query: str) -> Optional[str]:
@@ -311,9 +479,13 @@ def _search_api(query: str) -> Optional[str]:
                     json={
                         "api_key": tavily_key,
                         "query": query,
-                        "max_results": 3,
-                        "search_depth": "basic",
+                        "max_results": 5,  # More results for better brewery coverage
+                        "search_depth": "advanced",  # Get more detailed info including addresses
                         "include_answer": True,
+                        "include_raw_content": False,
+                        "include_domains": [],
+                        "exclude_domains": ["yelp.com"],  # Yelp often has outdated closure info
+                        "topic": "general",  # Use general for local business searches
                     },
                 )
                 resp.raise_for_status()
@@ -325,7 +497,7 @@ def _search_api(query: str) -> Optional[str]:
                 ]
                 combined = " ".join([answer] + snippets).strip()
                 if combined:
-                    return _compact(combined)
+                    return _compact(combined, limit=1200)  # More space for multiple breweries with addresses
         except Exception:
             pass  # Fail gracefully, try next option
 
@@ -380,39 +552,48 @@ def _with_prefix(prefix: str, summary: str) -> str:
 # Tools with real API calls + LLM fallback (graceful degradation pattern)
 @tool
 def essential_info(destination: str) -> str:
-    """Return essential destination info like weather, sights, and neighborhood scene for brew crawl planning."""
-    query = f"{destination} travel essentials weather best time top attractions etiquette language currency safety"
+    """Return essential local brewery scene info: popular neighborhoods for breweries, transit options, parking, and best times for crawls."""
+    query = f"{destination} craft beer scene brewery neighborhoods beer bars transit parking best time to visit breweries"
     summary = _search_api(query)
     if summary:
-        return _with_prefix(f"{destination} essentials", summary)
+        return _with_prefix(f"{destination} brewery scene", summary)
     
     # LLM fallback when no search API is configured
-    instruction = f"Summarize the climate, best visit time, standout sights, customs, language, currency, and safety tips for {destination} for brew crawl planning."
+    instruction = f"Describe the craft brewery scene in {destination}: popular brewery neighborhoods, how to get around, parking availability, and best times for a brewery crawl."
     return _llm_fallback(instruction)
 
 
 @tool
 def budget_basics(destination: str, duration: str) -> str:
-    """Return high-level crawl budget categories for a given destination and duration."""
-    query = f"{destination} travel budget average daily costs {duration}"
+    """Return brewery crawl budget: typical beer prices, flight costs, food prices, and transportation between stops."""
+    query = f"{destination} craft beer prices brewery costs pint prices beer flight costs food prices"
     summary = _search_api(query)
     if summary:
-        return _with_prefix(f"{destination} budget {duration}", summary)
+        return _with_prefix(f"{destination} brewery costs", summary)
     
-    instruction = f"Outline accommodation, meals, transport, activities, and extra costs for a {duration} brew crawl to {destination}."
+    instruction = f"Estimate costs for a {duration}-stop brewery crawl in {destination}: beer prices, flights, food, and transportation."
     return _llm_fallback(instruction)
 
 
 @tool
 def local_flavor(destination: str, interests: Optional[str] = None) -> str:
-    """Suggest craft breweries and bars matching optional interests."""
-    focus = interests or "local culture"
-    query = f"{destination} authentic local experiences {focus}"
+    """Find CURRENTLY OPEN craft breweries and beer bars with verified addresses and hours."""
+    focus = interests or "craft beer"
+    
+    # Try HERE API first - best source for verified addresses and current info
+    here_results = _here_api_search_breweries(destination, max_results=8)
+    if here_results:
+        return _with_prefix(f"{destination} breweries (verified addresses)", here_results)
+    
+    # Fall back to web search if HERE API unavailable
+    current_year = datetime.now().year
+    query = f"{destination} craft breweries open {current_year} currently operating beer bars {focus} addresses hours still in business"
     summary = _search_api(query)
     if summary:
-        return _with_prefix(f"{destination} {focus}", summary)
+        return _with_prefix(f"{destination} open breweries", summary)
     
-    instruction = f"Recommend craft breweries and bars in {destination} that highlight {focus}."
+    # Final fallback to LLM
+    instruction = f"List 5-8 craft breweries and beer bars in {destination} that are CURRENTLY OPEN and operating in {current_year}, with actual street addresses and specialties for {focus}. Do not include closed breweries."
     return _llm_fallback(instruction)
 
 
@@ -431,13 +612,13 @@ def day_plan(destination: str, day: int) -> str:
 # Additional simple tools per agent (to mirror original multi-tool behavior)
 @tool
 def weather_brief(destination: str) -> str:
-    """Return a brief weather summary for planning purposes."""
-    query = f"{destination} weather forecast travel season temperatures rainfall"
+    """Return current weather for outdoor brewery/beer garden planning."""
+    query = f"{destination} current weather today forecast outdoor seating"
     summary = _search_api(query)
     if summary:
         return _with_prefix(f"{destination} weather", summary)
     
-    instruction = f"Give a weather brief for {destination} noting season, temperatures, rainfall, humidity, and packing guidance."
+    instruction = f"Give today's weather for {destination} focusing on conditions for outdoor brewery seating and walking between venues."
     return _llm_fallback(instruction)
 
 
@@ -481,13 +662,21 @@ def local_customs(destination: str) -> str:
 
 @tool
 def hidden_gems(destination: str) -> str:
-    """Return lesser-known attractions and experiences."""
-    query = f"{destination} hidden gems local secrets lesser known spots"
+    """Return lesser-known OPEN breweries and beer bars with addresses."""
+    # Try HERE API first for comprehensive list, then filter in prompt
+    here_results = _here_api_search_breweries(destination, max_results=10)
+    if here_results:
+        return _with_prefix(f"{destination} breweries (all verified locations)", here_results)
+    
+    # Fall back to web search
+    current_year = datetime.now().year
+    query = f"{destination} hidden gem breweries open {current_year} lesser known craft beer bars currently operating neighborhood breweries addresses"
     summary = _search_api(query)
     if summary:
-        return _with_prefix(f"{destination} hidden gems", summary)
+        return _with_prefix(f"{destination} hidden breweries", summary)
     
-    instruction = f"List lesser-known attractions or experiences that feel like hidden gems in {destination}."
+    # Final fallback to LLM
+    instruction = f"List lesser-known craft breweries or neighborhood beer bars in {destination} that are CURRENTLY OPEN in {current_year}, with addresses. Focus on hidden gems, not mainstream venues."
     return _llm_fallback(instruction)
 
 
@@ -530,14 +719,15 @@ def research_agent(state: CrawlState) -> CrawlState:
     req = state["crawl_request"]
     destination = req["destination"]
     prompt_t = (
-        "You are a research assistant for brew crawl planning.\n"
-        "Gather essential information about {destination} for a beer crawl.\n"
-        "Use tools to get weather, visa, and essential info, then summarize."
+        "You are a research assistant for local brewery crawl planning.\n"
+        "Gather information about the craft beer scene in {destination}.\n"
+        "Focus on: neighborhood vibe, brewery concentration, transit options, and best times to visit.\n"
+        "Use tools to get local scene info and current weather, then provide a brief summary."
     )
     vars_ = {"destination": destination}
     
     messages = [SystemMessage(content=prompt_t.format(**vars_))]
-    tools = [essential_info, weather_brief, visa_brief]
+    tools = [essential_info, weather_brief]  # Removed visa_brief - not needed for local crawls
     agent = get_llm().bind_tools(tools)
     
     calls: List[Dict[str, Any]] = []
@@ -586,9 +776,10 @@ def budget_agent(state: CrawlState) -> CrawlState:
     destination, duration = req["destination"], req["duration"]
     budget = req.get("budget", "moderate")
     prompt_t = (
-        "You are a budget analyst for brew crawl planning.\n"
-        "Analyze crawl costs for {destination} over {duration} with budget: {budget}.\n"
-        "Use tools to get pricing information for breweries and bars, then provide a detailed breakdown."
+        "You are a budget analyst for brewery crawl planning.\n"
+        "Estimate costs for a {duration}-stop crawl in {destination} with budget level: {budget}.\n"
+        "Focus on: per-brewery costs (beers, flights, food), transportation between stops.\n"
+        "Provide cost per stop and total estimated crawl cost. Do NOT include hotel/accommodation costs."
     )
     vars_ = {"destination": destination, "duration": duration, "budget": budget}
     
@@ -640,18 +831,33 @@ def local_agent(state: CrawlState) -> CrawlState:
     interests = req.get("interests", "local culture")
     travel_style = req.get("travel_style", "standard")
     
-    # RAG: Retrieve curated local guides if enabled
+    # RAG: Retrieve curated local guides if enabled (only for exact city matches)
     context_lines = []
     if ENABLE_RAG:
-        retrieved = GUIDE_RETRIEVER.retrieve(destination, interests, k=3)
-        if retrieved:
-            context_lines.append("=== Curated Local Guides (from database) ===")
-            for idx, item in enumerate(retrieved, 1):
+        retrieved = GUIDE_RETRIEVER.retrieve(destination, interests, k=5)
+        # Filter to only include exact city matches
+        filtered = [r for r in retrieved if r["metadata"].get("city", "").lower() == destination.lower()]
+        
+        if filtered:
+            context_lines.append(f"=== {destination} Breweries from Curated Database ===")
+            for idx, item in enumerate(filtered, 1):
                 content = item["content"]
-                source = item["metadata"].get("source", "Unknown")
-                context_lines.append(f"{idx}. {content}")
-                context_lines.append(f"   Source: {source}")
-            context_lines.append("=== End of Curated Guides ===\n")
+                meta = item["metadata"]
+                venue = meta.get("venue_name", "")
+                address = meta.get("address", "")
+                
+                if venue and address:
+                    context_lines.append(f"{idx}. {venue}")
+                    context_lines.append(f"   Address: {address}")
+                    context_lines.append(f"   {content}")
+                else:
+                    context_lines.append(f"{idx}. {content}")
+                context_lines.append(f"   Source: {meta.get('source', 'Unknown')}")
+            context_lines.append(f"=== End of Database ===\n")
+            context_lines.append(f"Use venues above if available for {destination}. Otherwise, use venues from web search tools.")
+        else:
+            context_lines.append(f"=== No Database Entries for {destination} ===")
+            context_lines.append(f"Rely entirely on web search tools (local_flavor, hidden_gems) to find breweries in {destination}.")
     
     context_text = "\n".join(context_lines) if context_lines else ""
     
@@ -702,7 +908,13 @@ def local_agent(state: CrawlState) -> CrawlState:
         messages.append(res)
         messages.extend(tr["messages"])
         
-        synthesis_prompt = f"Create a curated list of craft breweries and bars for someone interested in {interests} with a {travel_style} approach."
+        synthesis_prompt = f"""Create a curated list of craft breweries and bars for someone interested in {interests} with a {travel_style} approach.
+
+CRITICAL: For EACH brewery, include:
+- Full venue name (exactly as shown in database)
+- Complete street address (exactly as shown in database)  
+- Brief description of beer styles and atmosphere
+Format each entry clearly so the itinerary agent can use the exact addresses."""
         messages.append(SystemMessage(content=synthesis_prompt))
         
         # Instrument synthesis LLM call
@@ -724,15 +936,38 @@ def itinerary_agent(state: CrawlState) -> CrawlState:
     user_input = (req.get("user_input") or "").strip()
     
     prompt_parts = [
-        "Create a {duration} brew crawl route for {destination} ({travel_style}).",
+        "You are creating a BREWERY CRAWL itinerary for {destination}.",
+        "This is a single-day crawl visiting {duration} different brewery/beer bar STOPS.",
         "",
-        "Inputs:",
+        "CRITICAL VENUE SELECTION RULES:",
+        "- ONLY use venues explicitly listed in the 'Local Breweries' section below",
+        "- Each venue MUST be CURRENTLY OPEN and operating (not closed or out of business)",
+        "- Each venue MUST be located in {destination}",
+        "- DO NOT invent breweries or use venues from other cities",
+        "- Copy venue names and addresses EXACTLY as shown in Local Breweries data",
+        "- If a venue's status is unclear, note it in the itinerary with 'Verify hours before visiting'",
+        "",
+        "FORMATTING RULES:",
+        "- Use 'Stop 1', 'Stop 2', 'Stop 3' etc. (NOT 'Day 1', 'Day 2')",
+        "- Format: Venue Name, Address, Beer Highlights, Why Visit",
+        "- Include walking/travel time between stops",
+        "- Estimated time at each stop: 60-90 minutes",
+        "- Do NOT mention breakfast, lunch, dinner, or departure",
+        "",
+        "Context from agents:",
         "Research: {research}",
         "Budget: {budget}",
-        "Local: {local}",
+        "",
+        "Local Breweries: {local}",
     ]
     if user_input:
-        prompt_parts.append("User input: {user_input}")
+        prompt_parts.append("User preferences: {user_input}")
+    
+    prompt_parts.extend([
+        "",
+        "Create a logical route that minimizes walking distance and follows a natural geographic flow.",
+        "Only include venues mentioned in the Local agent data above - do NOT invent breweries."
+    ])
     
     prompt_t = "\n".join(prompt_parts)
     vars_ = {
@@ -741,7 +976,7 @@ def itinerary_agent(state: CrawlState) -> CrawlState:
         "travel_style": travel_style,
         "research": (state.get("research") or "")[:400],
         "budget": (state.get("budget") or "")[:400],
-        "local": (state.get("local") or "")[:400],
+        "local": (state.get("local") or "")[:800],  # More context for venue names
         "user_input": user_input,
     }
     
@@ -838,14 +1073,25 @@ def health():
 # Initialize tracing once at startup, not per request
 if _TRACING:
     try:
-        space_id = os.getenv("ARIZE_SPACE_ID")
-        api_key = os.getenv("ARIZE_API_KEY")
-        if space_id and api_key:
-            tp = register(space_id=space_id, api_key=api_key, project_name="brew-crawl-planner")
+        # Phoenix Cloud uses PHOENIX_API_KEY and PHOENIX_COLLECTOR_ENDPOINT
+        # These are automatically picked up by the register() function
+        phoenix_api_key = os.getenv("PHOENIX_API_KEY")
+        phoenix_endpoint = os.getenv("PHOENIX_COLLECTOR_ENDPOINT")
+        
+        if phoenix_api_key and phoenix_endpoint:
+            # Register with Phoenix Cloud - it will use env vars automatically
+            tp = register(project_name="brew-crawl-planner")
             LangChainInstrumentor().instrument(tracer_provider=tp, include_chains=True, include_agents=True, include_tools=True)
             LiteLLMInstrumentor().instrument(tracer_provider=tp, skip_dep_check=True)
-    except Exception:
-        pass
+            print("✅ Phoenix tracing initialized successfully")
+            print(f"   Endpoint: {phoenix_endpoint}")
+        else:
+            print("⚠️  Phoenix tracing not configured - missing PHOENIX_API_KEY or PHOENIX_COLLECTOR_ENDPOINT")
+            print("   Set these in your .env file to enable tracing")
+    except Exception as e:
+        print(f"❌ Phoenix tracing initialization failed: {e}")
+        import traceback
+        traceback.print_exc()
 
 @app.post("/plan-crawl", response_model=CrawlResponse)
 def plan_crawl(req: CrawlRequest):
