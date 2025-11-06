@@ -16,13 +16,21 @@ services:
         sync: false
       - key: OPENROUTER_MODEL
         value: openai/gpt-4o-mini
-      - key: OPENAI_EMBED_MODEL
-        value: text-embedding-3-small
       - key: ENABLE_RAG
         value: "1"
+      - key: USE_HUGGINGFACE_EMBEDDINGS
+        value: "1"
+      - key: HUGGINGFACE_EMBED_MODEL
+        value: all-MiniLM-L6-v2
+      - key: HERE_API_KEY
+        sync: false
       - key: TAVILY_API_KEY
         sync: false
       - key: SERPAPI_API_KEY
+        sync: false
+      - key: PHOENIX_COLLECTOR_ENDPOINT
+        value: https://app.phoenix.arize.com
+      - key: PHOENIX_API_KEY
         sync: false
       - key: ARIZE_SPACE_ID
         sync: false
